@@ -80,6 +80,24 @@ python main.py
 
 Trains the CRNN on `train.csv`/`test.csv` and saves the best weights to `best_crnn_model.pth` whenever validation loss improves.
 
+Training can be customized via CLI flags:
+
+```bash
+python main.py --epochs 50 --batch-size 32 --lr 5e-4 --device cuda --output my_model.pth
+```
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--train-dir` | `dataset_crops/train` | Directory with training crops |
+| `--val-dir` | `dataset_crops/test` | Directory with validation crops |
+| `--train-csv` | `train.csv` | CSV with training `image_path,label` pairs |
+| `--val-csv` | `test.csv` | CSV with validation `image_path,label` pairs |
+| `--batch-size` | `64` | Batch size for both loaders |
+| `--epochs` | `25` | Number of training epochs |
+| `--lr` | `1e-3` | Learning rate for the Adam optimizer |
+| `--device` | auto (`cuda` if available, else `cpu`) | Force `cuda` or `cpu` |
+| `--output` | `best_crnn_model.pth` | Path to save the best model weights |
+
 ### 3. Inference
 
 ```bash

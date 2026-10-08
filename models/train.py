@@ -78,9 +78,9 @@ def validate_epoch(model, val_loader, criterion, device, idx2char, blank_idx=0):
     return avg_loss, cer, all_preds, all_targets
 
 
-def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, device='cuda'):
+def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, device='cuda', output_path="best_crnn_model.pth"):
     model = model.to(device)
-    
+
     criterion = nn.CTCLoss(blank=0, zero_infinity=True)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, factor=0.5)
@@ -123,7 +123,7 @@ def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, d
         
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
-            torch.save(model.state_dict(), "best_crnn_model.pth")
+            torch.save(model.state_dict(), output_path)
             saved_str = " -> ¡Modelo Guardado!"
         else:
             saved_str = ""
