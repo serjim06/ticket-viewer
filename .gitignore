@@ -1,5 +1,12 @@
 dataset_crops/
 
+# Generated training data (reproducible via setup/setup.py)
+/train.csv
+/test.csv
+
+# Model checkpoints
+*.pth
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
