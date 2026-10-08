@@ -1,29 +1,59 @@
-import pandas as pd
+"""Cleaning utilities for OCR label text and vocabulary extraction."""
+
 import re
 
-df = pd.read_csv("labels.csv")
-print("Muestras iniciales =", len(df))
+import pandas as pd
 
-df = df.dropna(subset=["label", "image_path"])
+LABEL_PATTERN = re.compile(r"^[A-Za-z0-9\s€$.,\-/:%#()&'*ÁÉÍÓÚáéíóúÑñ]{1,35}$")
 
-df["label"] = df["label"].astype(str)
 
-pattern = r"^[A-Za-z0-9\s€$.,\-/:%#()&'*ÁÉÍÓÚáéíóúÑñ]{1,35}$"
+def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Remove invalid rows and normalize label text.
 
-df_clean = df[df["label"].str.match(pattern)].copy()
+    Drops rows with a missing label or image path, discards labels that
+    don't match `LABEL_PATTERN` (disallowed characters or too long), and
+    collapses repeated whitespace in the remaining labels.
 
-df_clean["label"] = df_clean["label"].str.replace(r"\s+", " ", regex=True)
+    Args:
+        df: DataFrame with at least "label" and "image_path" columns.
 
-print("Muestras finales =", len(df_clean))
+    Returns:
+        A new, cleaned DataFrame.
+    """
+    df = df.dropna(subset=["label", "image_path"]).copy()
+    df["label"] = df["label"].astype(str)
 
-df_clean.to_csv("labels_clean.csv", index=False)
+    df = df[df["label"].str.match(LABEL_PATTERN)].copy()
+    df["label"] = df["label"].str.replace(r"\s+", " ", regex=True)
 
-vocab = sorted((set("".join(df_clean["label"]))))
+    return df
 
-print(f"\nVocabulario extraído ({len(vocab)} caracteres):")
-print(repr("".join(vocab)))
 
-with open("vocab.txt", "w", encoding="utf-8") as f:
-    f.write("".join(vocab))
+def extract_vocab(*dataframes: pd.DataFrame) -> str:
+    """Return the sorted set of unique characters found across label columns.
 
-print("\n¡Limpieza completa con RegEx guardada en 'labels_clean.csv'!")
+    Args:
+        *dataframes: One or more DataFrames with a "label" column.
+
+    Returns:
+        A string containing every distinct character, sorted.
+    """
+    chars = set()
+    for df in dataframes:
+        chars.update("".join(df["label"]))
+    return "".join(sorted(chars))
+
+
+if __name__ == "__main__":
+    train_df = clean_dataframe(pd.read_csv("train.csv"))
+    test_df = clean_dataframe(pd.read_csv("test.csv"))
+
+    train_df.to_csv("train.csv", index=False)
+    test_df.to_csv("test.csv", index=False)
+
+    vocab = extract_vocab(train_df, test_df)
+    with open("vocab.txt", "w", encoding="utf-8") as f:
+        f.write(vocab)
+
+    print(f"Train: {len(train_df)} muestras | Test: {len(test_df)} muestras")
+    print(f"Vocabulario ({len(vocab)} caracteres): {vocab!r}")

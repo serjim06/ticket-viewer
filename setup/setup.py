@@ -1,61 +1,84 @@
-from datasets import load_dataset
-import pandas as pd
+"""Builds the OCR training data: downloads the SROIE dataset, crops every
+labeled word box into its own image, cleans the label text, and writes the
+resulting train/test CSVs and character vocabulary.
+"""
+
+from pathlib import Path
+
 import cv2
-import matplotlib.pyplot as plt
-import os
 import numpy as np
+import pandas as pd
+from datasets import load_dataset
 from tqdm import tqdm
 
-dataset = load_dataset("jsdnrs/ICDAR2019-SROIE")
+from clean_labels import clean_dataframe, extract_vocab
 
-output_dir = "./dataset_crops"
-os.makedirs(output_dir, exist_ok=True)
-
-data_records = []
-crop_count = 0
-
-train_data = dataset["train"]
+DATASET_NAME = "jsdnrs/ICDAR2019-SROIE"
+CROPS_ROOT = Path("./dataset_crops")
+MIN_CROP_SIZE = 5
 
 
-for item in tqdm(train_data):
-    pil_image = item["image"]
-    image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-    
-    words = item.get("words", [])
-    boxes = item.get("bboxes", [])
-    
-    for box, text in zip(boxes, words):
-        text_str = str(text).strip()
-        if not text_str:
-            continue
-        
-        try:
-            x_min, y_min, x_max, y_max = map(int, box[:4])
-            
-            crop = image[y_min:y_max, x_min:x_max]
-            
-            if crop.shape[0] < 5 or crop.shape[1] < 5:
+def crop_split(split_name: str, split_data) -> pd.DataFrame:
+    """Crop every labeled word box in a dataset split and save it to disk.
+
+    Args:
+        split_name: Name of the split ("train" or "test"); also used as
+            the output subdirectory under `dataset_crops/`.
+        split_data: A HuggingFace dataset split with "image", "words" and
+            "bboxes" fields.
+
+    Returns:
+        A DataFrame with one row per cropped word: "image_path", "label".
+    """
+    output_dir = CROPS_ROOT / split_name
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    records = []
+    crop_count = 0
+
+    for item in tqdm(split_data, desc=f"Procesando {split_name}"):
+        image = cv2.cvtColor(np.array(item["image"]), cv2.COLOR_RGB2BGR)
+
+        for box, text in zip(item.get("bboxes", []), item.get("words", [])):
+            label = str(text).strip()
+            if not label:
                 continue
-            
-            crop_filename = f"crop_{crop_count:06d}.png"
-            crop_path = os.path.join(output_dir, crop_filename)
-            cv2.imwrite(crop_path, crop)
-            
-            data_records.append({
-                "image_path": crop_path,
-                "label": text_str
-            })
-            
+
+            try:
+                x_min, y_min, x_max, y_max = map(int, box[:4])
+                crop = image[y_min:y_max, x_min:x_max]
+            except (TypeError, ValueError):
+                continue
+
+            if crop.shape[0] < MIN_CROP_SIZE or crop.shape[1] < MIN_CROP_SIZE:
+                continue
+
+            crop_path = output_dir / f"crop_{crop_count:06d}.png"
+            cv2.imwrite(str(crop_path), crop)
+
+            records.append({"image_path": str(crop_path), "label": label})
             crop_count += 1
-            
-        except Exception:
-            print("ERROR")
-            continue
-        
-df = pd.DataFrame(data_records)
-df.to_csv("labels.csv", index=False)
 
-print("Finished!")
+    return pd.DataFrame(records)
 
-print(df.head())
 
+def main():
+    """Run the full pipeline and write train.csv, test.csv and vocab.txt."""
+    dataset = load_dataset(DATASET_NAME)
+
+    train_df = clean_dataframe(crop_split("train", dataset["train"]))
+    test_df = clean_dataframe(crop_split("test", dataset["test"]))
+
+    train_df.to_csv("train.csv", index=False)
+    test_df.to_csv("test.csv", index=False)
+
+    vocab = extract_vocab(train_df, test_df)
+    with open("vocab.txt", "w", encoding="utf-8") as f:
+        f.write(vocab)
+
+    print(f"Train: {len(train_df)} muestras | Test: {len(test_df)} muestras")
+    print(f"Vocabulario ({len(vocab)} caracteres): {vocab!r}")
+
+
+if __name__ == "__main__":
+    main()
