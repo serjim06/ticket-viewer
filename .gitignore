@@ -3,6 +3,7 @@ dataset_crops/
 # Generated training data (reproducible via setup/setup.py)
 /train.csv
 /test.csv
+vocab.txt
 
 # Model checkpoints
 *.pth
