@@ -47,6 +47,17 @@ def calculate_cer(predictions, targets):
         
     return total_dist / total_chars
 
+
+def calculate_word_accuracy(predictions, targets):
+    """
+    Calcula el Word Accuracy: proporción de predicciones que coinciden exactamente con el objetivo.
+    """
+    if not targets:
+        return 0.0
+
+    correct = sum(1 for pred, target in zip(predictions, targets) if pred == target)
+    return correct / len(targets)
+
 def validate_epoch(model, val_loader, criterion, device, idx2char, blank_idx=0):
     model.eval()
     val_loss = 0.0
@@ -74,8 +85,9 @@ def validate_epoch(model, val_loader, criterion, device, idx2char, blank_idx=0):
             
     avg_loss = val_loss / len(val_loader)
     cer = calculate_cer(all_preds, all_targets)
-    
-    return avg_loss, cer, all_preds, all_targets
+    word_acc = calculate_word_accuracy(all_preds, all_targets)
+
+    return avg_loss, cer, word_acc, all_preds, all_targets
 
 
 def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, device='cuda', output_path="best_crnn_model.pth"):
@@ -115,7 +127,7 @@ def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, d
         avg_train_loss = train_loss / len(train_loader)
         
         # Validación
-        avg_val_loss, val_cer, val_preds, val_targets = validate_epoch(
+        avg_val_loss, val_cer, val_word_acc, val_preds, val_targets = validate_epoch(
             model, val_loader, criterion, device, idx2char, blank_idx=0
         )
         
@@ -128,7 +140,7 @@ def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, d
         else:
             saved_str = ""
 
-        print(f"Epoch [{epoch}/{epochs}] | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f} | Val CER: {val_cer:.4f}{saved_str}")
+        print(f"Epoch [{epoch}/{epochs}] | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f} | Val CER: {val_cer:.4f} | Val Word Acc: {val_word_acc:.4f}{saved_str}")
         
         print(f"  Real : {val_targets[:2]}")
         print(f"  Pred : {val_preds[:2]}")
