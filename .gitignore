@@ -1,6 +1,6 @@
 dataset_crops/
 
-# Generated training data (reproducible via setup/setup.py)
+# Generated training data (reproducible via python -m models.crnn.setup)
 /train.csv
 /test.csv
 vocab.txt
@@ -87,6 +87,7 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+*.ipynb
 
 # IPython
 profile_default/
