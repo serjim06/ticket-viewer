@@ -31,12 +31,12 @@ ticket-viewer/
 ├── main.py                  # Training entry point
 ├── inferencia.py             # Inference script (CLI)
 ├── models/
-│   ├── model.py               # CRNN architecture
+│   ├── crnn/
+│   │   ├── crnn.py              # CRNN architecture
+│   │   ├── setup.py             # Dataset download and cropping (train/test)
+│   │   └── clean_labels.py      # Label cleaning and vocabulary extraction
 │   ├── preprocess.py           # Dataset, DataLoader and image transforms
 │   └── train.py                # Training loop, validation and CTC decoding
-├── setup/
-│   ├── setup.py                # Dataset download and cropping (train/test)
-│   └── clean_labels.py          # Label cleaning and vocabulary extraction
 ├── requirements.txt
 ├── LICENSE
 └── README.md
@@ -67,7 +67,7 @@ pip install -r requirements.txt
 ### 1. Prepare the dataset
 
 ```bash
-python setup/setup.py
+python -m models.crnn.setup
 ```
 
 Downloads the ICDAR2019-SROIE dataset, crops every labeled word into `dataset_crops/train/` and `dataset_crops/test/`, cleans the label text, and generates `train.csv`, `test.csv` and `vocab.txt`.

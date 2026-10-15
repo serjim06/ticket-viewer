@@ -11,7 +11,7 @@ import pandas as pd
 from datasets import load_dataset
 from tqdm import tqdm
 
-from clean_labels import clean_dataframe, extract_vocab
+from models.crnn.clean_labels import clean_dataframe, extract_vocab
 
 DATASET_NAME = "jsdnrs/ICDAR2019-SROIE"
 CROPS_ROOT = Path("./dataset_crops")

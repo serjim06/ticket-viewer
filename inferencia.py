@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import torch
 from PIL import Image
 
-from models.model import CRNN
+from models.crnn.crnn import CRNN
 from models.preprocess import PreprocessTransform
 from models.train import greedy_decode
 
