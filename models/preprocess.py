@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, random_split
 from torchvision import transforms, datasets
 import torchvision.transforms.functional as F
 from PIL import Image
@@ -95,21 +95,46 @@ def ctc_collate_fn(batch):
     return images, targets, target_lengths, labels_text    
 
     
-def get_loader(dataset_dir, labels_csv_path, batch_size=64, shuffle=True):
+def get_loaders(train_dir, test_dir, train_labels_path, test_labels_path, split=0.8, batch_size=64, shuffle=True):
     transformer = PreprocessTransform(alto_fijo=32, ancho_maximo=256)
     
     dataset = ImageDataset(
-        dataset_dir=dataset_dir, 
-        labels_csv_path=labels_csv_path, 
+        dataset_dir=train_dir, 
+        labels_csv_path=train_labels_path, 
         transform=transformer
     )
     
-    loader = DataLoader(
-        dataset, 
+    test_dataset = ImageDataset(
+        dataset_dir=test_dir,
+        labels_csv_path=test_labels_path,
+        transform=transformer
+    )
+    
+    train_size = int(len(dataset)*split)
+    val_size = len(dataset) - train_size
+    
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        collate_fn=ctc_collate_fn
+    )
+    
+    val_loader = DataLoader(
+        val_dataset, 
         batch_size=batch_size, 
         shuffle=shuffle, 
         collate_fn=ctc_collate_fn
     )
     
-    return loader
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        collate_fn=ctc_collate_fn
+    )
+    
+    return train_loader, val_loader, test_loader
     
