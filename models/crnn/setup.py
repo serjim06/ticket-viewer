@@ -14,7 +14,7 @@ from tqdm import tqdm
 from clean_labels import clean_dataframe, extract_vocab
 
 DATASET_NAME = "jsdnrs/ICDAR2019-SROIE"
-CROPS_ROOT = Path("./dataset_crops")
+CROPS_ROOT = Path("./datasets/dataset_crops")
 MIN_CROP_SIZE = 5
 
 
@@ -23,7 +23,7 @@ def crop_split(split_name: str, split_data) -> pd.DataFrame:
 
     Args:
         split_name: Name of the split ("train" or "test"); also used as
-            the output subdirectory under `dataset_crops/`.
+            the output subdirectory under `datasets/dataset_crops/`.
         split_data: A HuggingFace dataset split with "image", "words" and
             "bboxes" fields.
 
@@ -69,8 +69,8 @@ def main():
     train_df = clean_dataframe(crop_split("train", dataset["train"]))
     test_df = clean_dataframe(crop_split("test", dataset["test"]))
 
-    train_df.to_csv("train.csv", index=False)
-    test_df.to_csv("test.csv", index=False)
+    train_df.to_csv(CROPS_ROOT / "train.csv", index=False)
+    test_df.to_csv(CROPS_ROOT / "test.csv", index=False)
 
     vocab = extract_vocab(train_df, test_df)
     with open("vocab.txt", "w", encoding="utf-8") as f:

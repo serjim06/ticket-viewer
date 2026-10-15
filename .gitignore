@@ -1,6 +1,6 @@
-dataset_crops/
+datasets/
 
-# Generated training data (reproducible via python -m models.crnn.setup)
+# Generated training data (reproducible via python models/crnn/setup.py)
 /train.csv
 /test.csv
 vocab.txt

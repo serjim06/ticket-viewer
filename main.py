@@ -9,10 +9,10 @@ import torch
 def parse_args():
     parser = argparse.ArgumentParser(description="Entrena el modelo CRNN para reconocimiento de texto en recortes de tickets.")
 
-    parser.add_argument('--train-dir', type=str, default='dataset_crops/train', help='Directorio con las imágenes de entrenamiento (default: dataset_crops/train)')
-    parser.add_argument('--test-dir', type=str, default='dataset_crops/test', help='Directorio con las imágenes de test (default: dataset_crops/test)')
-    parser.add_argument('--train-csv', type=str, default='train.csv', help='CSV con las etiquetas de entrenamiento (default: train.csv)')
-    parser.add_argument('--test-csv', type=str, default='test.csv', help='CSV con las etiquetas de test (default: test.csv)')
+    parser.add_argument('--train-dir', type=str, default='datasets/dataset_crops/train', help='Directorio con las imágenes de entrenamiento (default: datasets/dataset_crops/train)')
+    parser.add_argument('--test-dir', type=str, default='datasets/dataset_crops/test', help='Directorio con las imágenes de test (default: datasets/dataset_crops/test)')
+    parser.add_argument('--train-csv', type=str, default='datasets/dataset_crops/train.csv', help='CSV con las etiquetas de entrenamiento (default: datasets/dataset_crops/train.csv)')
+    parser.add_argument('--test-csv', type=str, default='datasets/dataset_crops/test.csv', help='CSV con las etiquetas de test (default: datasets/dataset_crops/test.csv)')
     parser.add_argument('--split', type=float, default=0.8, help="Train/val split")
     parser.add_argument('--batch-size', type=int, default=64, help='Tamaño de batch (default: 64)')
     parser.add_argument('--epochs', type=int, default=25, help='Número de épocas de entrenamiento (default: 25)')

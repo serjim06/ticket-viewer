@@ -1,9 +1,11 @@
 """Cleaning utilities for OCR label text and vocabulary extraction."""
 
 import re
+from pathlib import Path
 
 import pandas as pd
 
+CSV_ROOT = Path("./datasets/dataset_crops")
 LABEL_PATTERN = re.compile(r"^[A-Za-z0-9\s€$.,\-/:%#()&'*ÁÉÍÓÚáéíóúÑñ]{1,35}$")
 
 
@@ -45,11 +47,11 @@ def extract_vocab(*dataframes: pd.DataFrame) -> str:
 
 
 if __name__ == "__main__":
-    train_df = clean_dataframe(pd.read_csv("train.csv"))
-    test_df = clean_dataframe(pd.read_csv("test.csv"))
+    train_df = clean_dataframe(pd.read_csv(CSV_ROOT / "train.csv"))
+    test_df = clean_dataframe(pd.read_csv(CSV_ROOT / "test.csv"))
 
-    train_df.to_csv("train.csv", index=False)
-    test_df.to_csv("test.csv", index=False)
+    train_df.to_csv(CSV_ROOT / "train.csv", index=False)
+    test_df.to_csv(CSV_ROOT / "test.csv", index=False)
 
     vocab = extract_vocab(train_df, test_df)
     with open("vocab.txt", "w", encoding="utf-8") as f:
