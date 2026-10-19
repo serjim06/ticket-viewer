@@ -97,7 +97,7 @@ def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, d
     optimizer = optim.Adam(model.parameters(), lr=lr)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, factor=0.5)
 
-    best_val_loss = float('inf')
+    best_val_cer = float('inf')
     history = []
 
     for epoch in range(1, epochs + 1):
@@ -134,8 +134,8 @@ def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, d
         
         scheduler.step(avg_val_loss)
         
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
+        if val_cer < best_val_cer:
+            best_val_cer = val_cer
             torch.save(model.state_dict(), output_path)
             saved_str = " -> ¡Modelo Guardado!"
         else:

@@ -80,7 +80,7 @@ Downloads the ICDAR2019-SROIE dataset, crops every labeled word into `datasets/d
 python main.py
 ```
 
-Trains the CRNN on `train.csv`/`test.csv` and saves the best weights to `best_crnn_model.pth` whenever validation loss improves. When training finishes, the run's config, per-epoch metrics (loss, CER, word accuracy, LR) and best epoch are written to a timestamped JSON in `results/crnn/`.
+Trains the CRNN on `train.csv`/`test.csv` and saves the best weights to `best_crnn_model.pth` whenever the validation CER (Character Error Rate) improves. When training finishes, the run's config, per-epoch metrics (loss, CER, word accuracy, LR) and best epoch (lowest validation CER) are written to a timestamped JSON in `results/crnn/`.
 
 Training can be customized via CLI flags:
 

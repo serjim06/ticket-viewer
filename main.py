@@ -54,7 +54,7 @@ def main():
 
     config = {k: v for k, v in vars(args).items() if k != 'results_dir'}
     config['device'] = str(device)
-    results_path = save_results('crnn', config, history, results_dir=args.results_dir)
+    results_path = save_results('crnn', config, history, results_dir=args.results_dir, best_metric='val_cer')
     print(f"Resultados guardados en {results_path}")
 
 
