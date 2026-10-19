@@ -17,6 +17,7 @@ def parse_args():
     parser.add_argument('--split', type=float, default=0.8, help="Train/val split")
     parser.add_argument('--batch-size', type=int, default=64, help='Tamaño de batch (default: 64)')
     parser.add_argument('--epochs', type=int, default=25, help='Número de épocas de entrenamiento (default: 25)')
+    parser.add_argument('--patience', type=int, default=5, help='Épocas sin mejorar val_cer antes de parar el entrenamiento; 0 lo desactiva (default: 5)')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate (default: 1e-3)')
     parser.add_argument('--device', type=str, default=None, choices=['cuda', 'cpu'], help='Dispositivo a usar (default: cuda si está disponible, si no cpu)')
     parser.add_argument('--output', type=str, default='best_crnn_model.pth', help='Ruta donde guardar los mejores pesos del modelo (default: best_crnn_model.pth)')
@@ -49,7 +50,8 @@ def main():
         epochs=args.epochs,
         lr=args.lr,
         device=device,
-        output_path=args.output
+        output_path=args.output,
+        patience=args.patience
     )
 
     print("Entrenamiento completado. Evaluando el mejor checkpoint en test...")

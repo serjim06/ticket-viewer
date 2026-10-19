@@ -109,7 +109,11 @@ def evaluate_model(model, test_loader, idx2char, weights_path, device='cuda'):
     return {"test_loss": test_loss, "test_cer": test_cer, "test_word_acc": test_word_acc}
 
 
-def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, device='cuda', output_path="best_crnn_model.pth"):
+def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, device='cuda', output_path="best_crnn_model.pth", patience=5):
+    """
+    Entrena el modelo guardando el checkpoint con menor val_cer.
+    Si val_cer no mejora en `patience` épocas seguidas, se detiene (early stopping). patience=0 lo desactiva.
+    """
     model = model.to(device)
 
     criterion = nn.CTCLoss(blank=0, zero_infinity=True)
@@ -117,6 +121,7 @@ def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, d
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=2, factor=0.5)
 
     best_val_cer = float('inf')
+    epochs_without_improvement = 0
     history = []
 
     for epoch in range(1, epochs + 1):
@@ -155,9 +160,11 @@ def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, d
         
         if val_cer < best_val_cer:
             best_val_cer = val_cer
+            epochs_without_improvement = 0
             torch.save(model.state_dict(), output_path)
             saved_str = " -> ¡Modelo Guardado!"
         else:
+            epochs_without_improvement += 1
             saved_str = ""
 
         history.append({
@@ -174,5 +181,9 @@ def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, d
         print(f"  Real : {val_targets[:2]}")
         print(f"  Pred : {val_preds[:2]}")
         print("-" * 60)
+
+        if patience and epochs_without_improvement >= patience:
+            print(f"Early stopping: val_cer sin mejorar en {patience} épocas. Mejor val_cer: {best_val_cer:.4f}")
+            break
 
     return history

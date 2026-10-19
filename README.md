@@ -97,6 +97,7 @@ python main.py --epochs 50 --batch-size 32 --lr 5e-4 --device cuda --output my_m
 | `--batch-size` | `64` | Batch size for both loaders |
 | `--epochs` | `25` | Number of training epochs |
 | `--lr` | `1e-3` | Learning rate for the Adam optimizer |
+| `--patience` | `5` | Stop training after this many epochs without validation CER improvement (`0` disables early stopping) |
 | `--device` | auto (`cuda` if available, else `cpu`) | Force `cuda` or `cpu` |
 | `--output` | `best_crnn_model.pth` | Path to save the best model weights |
 | `--results-dir` | `results/crnn` | Directory where the training results JSON is saved |
