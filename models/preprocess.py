@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data import DataLoader, Dataset, random_split
+from torch.utils.data import DataLoader, Dataset, random_split, Subset
 from torchvision import transforms, datasets
 import torchvision.transforms.functional as F
 from PIL import Image
@@ -9,6 +9,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.model_selection import train_test_split
 import pandas as pd
+from torchvision import transforms as T
+from PIL import ImageFilter
+import random
+
 
 raw_chars = " #$%&'()*-./0123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZlr"
 BLANK_TOKEN = "<BLANK>"
@@ -18,13 +22,24 @@ idx2char = {i: char for i, char in enumerate(vocab)}
 
 BLANK_IDX = 0
 
-
+class RandomInk:
+    """
+    Simulates thinner or thicker ink strokes  
+    """
+    def __call__(self, img):
+        r = random.random()
+        if r < 0.15:
+            return img.filter(ImageFilter.MinFilter(3))
+        if r < 0.3:
+            return img.filter(ImageFilter.MaxFilter(3))
+        return img
 class PreprocessTransform:
-    def __init__(self, alto_fijo=32, ancho_maximo=128):
+    def __init__(self, alto_fijo=32, ancho_maximo=128, augment = None):
         self.alto_fijo = alto_fijo
         self.ancho_maximo = ancho_maximo
         self.media = [0.91]
         self.std = [0.15]
+        self.augment = augment
 
     def __call__(self, img: Image.Image) -> torch.Tensor:
         img = img.convert('L')
@@ -39,6 +54,9 @@ class PreprocessTransform:
         if nuevo_ancho < self.ancho_maximo:
             pad_derecha = self.ancho_maximo - nuevo_ancho
             img = F.pad(img, (0, 0, pad_derecha, 0), fill=255)
+            
+        if self.augment:
+            img = self.augment(img)
             
         tensor_img = F.to_tensor(img)
         tensor_img = F.normalize(tensor_img, mean=self.media, std=self.std)
@@ -96,24 +114,41 @@ def ctc_collate_fn(batch):
 
     
 def get_loaders(train_dir, test_dir, train_labels_path, test_labels_path, split=0.8, batch_size=64, shuffle=True):
-    transformer = PreprocessTransform(alto_fijo=32, ancho_maximo=256)
+    augment = T.Compose([
+        T.RandomApply([T.RandomAffine(degrees=2, shear=(-5,5,0,0), fill=255)], p=0.5),
+        T.RandomApply([T.GaussianBlur(3, sigma=(0.1,1.0))], p=0.5),
+        T.RandomApply([T.ColorJitter(brightness=0.3, contrast=0.4)], p=0.5),
+        RandomInk(),
+    ])
+    train_transformer = PreprocessTransform(alto_fijo=32, ancho_maximo=256, augment=augment)
+    val_transformer = PreprocessTransform(alto_fijo=32, ancho_maximo=256, augment=None)
     
-    dataset = ImageDataset(
+    train_dataset = ImageDataset(
         dataset_dir=train_dir, 
         labels_csv_path=train_labels_path, 
-        transform=transformer
+        transform=train_transformer
     )
+    
+    val_dataset = ImageDataset(
+            dataset_dir=train_dir, 
+            labels_csv_path=train_labels_path, 
+            transform=val_transformer
+        )
     
     test_dataset = ImageDataset(
         dataset_dir=test_dir,
         labels_csv_path=test_labels_path,
-        transform=transformer
+        transform=val_transformer
     )
     
-    train_size = int(len(dataset)*split)
-    val_size = len(dataset) - train_size
+    g = torch.Generator().manual_seed(42)
+    idx = torch.randperm(len(train_dataset), generator=g).tolist()
     
-    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    
+    train_size = int(len(idx)*split)
+    
+    train_dataset = Subset(train_dataset, idx[:train_size])
+    val_dataset = Subset(val_dataset, idx[train_size:])
     
     train_loader = DataLoader(
         train_dataset,
