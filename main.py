@@ -2,7 +2,7 @@ import argparse
 import models
 from models.crnn.crnn import CRNN
 from models.preprocess import vocab, idx2char
-from models.train import train_model
+from models.train import train_model, evaluate_model
 from models.results import save_results, default_results_dir
 import torch
 
@@ -52,9 +52,19 @@ def main():
         output_path=args.output
     )
 
+    print("Entrenamiento completado. Evaluando el mejor checkpoint en test...")
+
+    test_metrics = evaluate_model(
+        model=model,
+        test_loader=test_loader,
+        idx2char=idx2char,
+        weights_path=args.output,
+        device=device
+    )
+
     config = {k: v for k, v in vars(args).items() if k != 'results_dir'}
     config['device'] = str(device)
-    results_path = save_results('crnn', config, history, results_dir=args.results_dir, best_metric='val_cer')
+    results_path = save_results('crnn', config, history, results_dir=args.results_dir, best_metric='val_cer', test_metrics=test_metrics)
     print(f"Resultados guardados en {results_path}")
 
 

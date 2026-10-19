@@ -90,6 +90,25 @@ def validate_epoch(model, val_loader, criterion, device, idx2char, blank_idx=0):
     return avg_loss, cer, word_acc, all_preds, all_targets
 
 
+def evaluate_model(model, test_loader, idx2char, weights_path, device='cuda'):
+    """
+    Carga los pesos del mejor checkpoint y evalúa el modelo sobre el conjunto de test.
+    """
+    model.load_state_dict(torch.load(weights_path, map_location=device))
+    model = model.to(device)
+
+    criterion = nn.CTCLoss(blank=0, zero_infinity=True)
+    test_loss, test_cer, test_word_acc, test_preds, test_targets = validate_epoch(
+        model, test_loader, criterion, device, idx2char, blank_idx=0
+    )
+
+    print(f"Test | Loss: {test_loss:.4f} | CER: {test_cer:.4f} | Word Acc: {test_word_acc:.4f}")
+    print(f"  Real : {test_targets[:2]}")
+    print(f"  Pred : {test_preds[:2]}")
+
+    return {"test_loss": test_loss, "test_cer": test_cer, "test_word_acc": test_word_acc}
+
+
 def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, device='cuda', output_path="best_crnn_model.pth"):
     model = model.to(device)
 
