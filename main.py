@@ -3,6 +3,7 @@ import models
 from models.crnn.crnn import CRNN
 from models.preprocess import vocab, idx2char
 from models.train import train_model
+from models.results import save_results, default_results_dir
 import torch
 
 
@@ -19,6 +20,7 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate (default: 1e-3)')
     parser.add_argument('--device', type=str, default=None, choices=['cuda', 'cpu'], help='Dispositivo a usar (default: cuda si está disponible, si no cpu)')
     parser.add_argument('--output', type=str, default='best_crnn_model.pth', help='Ruta donde guardar los mejores pesos del modelo (default: best_crnn_model.pth)')
+    parser.add_argument('--results-dir', type=str, default=default_results_dir('crnn'), help='Directorio donde guardar los resultados del entrenamiento (default: results/crnn)')
 
     return parser.parse_args()
 
@@ -39,7 +41,7 @@ def main():
 
     print("Preprocesado completado. Iniciando entrenamiento...")
 
-    train_model(
+    history = train_model(
         model=model,
         train_loader=train_loader,
         val_loader=val_loader,
@@ -49,6 +51,11 @@ def main():
         device=device,
         output_path=args.output
     )
+
+    config = {k: v for k, v in vars(args).items() if k != 'results_dir'}
+    config['device'] = str(device)
+    results_path = save_results('crnn', config, history, results_dir=args.results_dir)
+    print(f"Resultados guardados en {results_path}")
 
 
 if __name__ == '__main__':
