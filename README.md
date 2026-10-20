@@ -83,7 +83,7 @@ To prepare the data for the U-Net text detector (work in progress):
 python models/u-net/setup.py
 ```
 
-Exports the full receipt images to `datasets/u-net/train/` and `datasets/u-net/test/`. For the train split, it also builds a segmentation mask per image from the word bounding boxes: `train_masks/` holds the class-index masks used as training targets (0 = background, 1 = box fill, 2 = box border), and `train_masks_visible/` holds the same masks rescaled to 0/128/255 for visual inspection.
+Exports the full receipt images to `datasets/u-net/train/` and `datasets/u-net/test/`, normalised so text has a similar scale across the dataset: full-page A4 scans (wider than 4000 px) are first cropped to the union of their word boxes plus a 50 px margin, and then every image is resized to a width of 640 px keeping its aspect ratio. Padding to a multiple of 32 is left to the data loader. For the train split, it also builds a segmentation mask per image from the word bounding boxes, painted after resizing so the 2 px borders are kept at the final resolution: `train_masks/` holds the class-index masks used as training targets (0 = background, 1 = box fill, 2 = box border), and `train_masks_visible/` holds the same masks rescaled to 0/128/255 for visual inspection.
 
 ### 2. Train the model
 
@@ -138,7 +138,7 @@ The CRNN recognizer currently works on pre-cropped word images. Next steps aim t
 
 **Text detection (segmentation)**
 
-- [ ] U-Net-based text detector: encoder/decoder that takes a 512×512 receipt image and outputs a 512×512 heatmap of text regions
+- [ ] U-Net-based text detector: encoder/decoder that takes a receipt image resized to 640 px wide (trained on 512×512 crops) and outputs a same-size heatmap of text regions
 - [x] Script to build training masks from SROIE annotations (`models/u-net/setup.py`): 3-class masks (background, box fill, box border) plus high-contrast copies for visual inspection
 - [ ] Detector training loop (BCE / Dice loss)
 - [ ] Heatmap → bounding boxes via thresholding and contour detection
