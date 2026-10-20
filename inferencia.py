@@ -10,8 +10,8 @@ import torch
 from PIL import Image
 
 from models.crnn.crnn import CRNN
-from models.preprocess import PreprocessTransform
-from models.train import greedy_decode
+from models.crnn.preprocess import PreprocessTransform
+from models.crnn.train import greedy_decode
 
 RAW_CHARS = " #$%&'()*-./0123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZlr"
 BLANK_TOKEN = "<BLANK>"

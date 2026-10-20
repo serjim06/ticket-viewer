@@ -1,8 +1,8 @@
 import argparse
 import models
 from models.crnn.crnn import CRNN
-from models.preprocess import vocab, idx2char
-from models.train import train_model, evaluate_model
+from models.crnn.preprocess import vocab, idx2char
+from models.crnn.train import train_model, evaluate_model
 from models.results import save_results, default_results_dir
 import torch
 
@@ -31,7 +31,7 @@ def main():
 
     device = torch.device(args.device) if args.device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    train_loader, val_loader, test_loader = models.preprocess.get_loaders(train_dir=args.train_dir, test_dir=args.test_dir, 
+    train_loader, val_loader, test_loader = models.preprocess.get_loaders_crnn(train_dir=args.train_dir, test_dir=args.test_dir, 
                                                                          train_labels_path=args.train_csv, test_labels_path = args.test_csv,
                                                                          split=args.split, batch_size=args.batch_size, shuffle=True)
     

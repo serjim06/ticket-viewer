@@ -64,7 +64,7 @@ class PreprocessTransform:
         return tensor_img
     
 class ImageDataset(Dataset):
-    def __init__(self, dataset_dir, labels_csv_path, transform=None):
+    def __init__(self, dataset_dir, labels_csv_path=None, transform=None):
         self.dataset_dir = dataset_dir
         self.transform = transform
         
@@ -113,7 +113,7 @@ def ctc_collate_fn(batch):
     return images, targets, target_lengths, labels_text    
 
     
-def get_loaders(train_dir, test_dir, train_labels_path, test_labels_path, split=0.8, batch_size=64, shuffle=True):
+def get_loaders_crnn(train_dir, test_dir, train_labels_path, test_labels_path, split=0.8, batch_size=64, shuffle=True):
     augment = T.Compose([
         T.RandomApply([T.RandomAffine(degrees=2, shear=(-5,5,0,0), fill=255)], p=0.5),
         T.RandomApply([T.GaussianBlur(3, sigma=(0.1,1.0))], p=0.5),
