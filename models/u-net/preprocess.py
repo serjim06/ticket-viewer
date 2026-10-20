@@ -14,6 +14,8 @@ from torchvision import transforms as T
 from PIL import ImageFilter
 import random
 
+MEAN, STD = [0.9137], [0.1841]  # placeholder: recalcúlalos sobre datasets/u-net/train
+
 
 class UNetDataset(Dataset):
     def __init__(self, images_dir, masks_dir=None, transform=None):
@@ -66,7 +68,6 @@ def pad_to_multiple(*inputs, multiple=32):
 
 def get_unet_loaders(train_path, train_mask_path, test_path, test_mask_path, split=0.8, batch_size=8, shuffle=True):
     FILL = {tv_tensors.Image: 255, tv_tensors.Mask: 255}
-    MEAN, STD = [0.9137], [0.1841]  # placeholder: recalcúlalos sobre datasets/u-net/train
 
     train_tf = v2.Compose([
         v2.RandomAffine(degrees=3, scale=(0.8, 1.2), fill=FILL, interpolation=v2.InterpolationMode.BILINEAR),
