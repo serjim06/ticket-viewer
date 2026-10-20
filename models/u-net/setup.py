@@ -9,8 +9,6 @@ for training and as high-contrast masks for visual inspection.
 from pathlib import Path
 
 import cv2
-import os
-import random
 import numpy as np
 
 from datasets import load_dataset
