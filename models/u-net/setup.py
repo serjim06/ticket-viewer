@@ -4,10 +4,10 @@ Downloads the ICDAR2019-SROIE receipt dataset from the Hugging Face Hub and
 exports its images to disk. Every image is normalised to a fixed width so
 that text has a similar scale across the dataset: full-page A4 scans are
 first cropped to the receipt area, and then all images are resized to
-``TARGET_WIDTH`` keeping their aspect ratio. For the training split, it also
-generates segmentation masks from the text bounding boxes at the final
-resolution, both as class-index masks for training and as high-contrast
-masks for visual inspection.
+``TARGET_WIDTH`` keeping their aspect ratio. For both the train and test
+splits, it also generates segmentation masks from the text bounding boxes at
+the final resolution, both as class-index masks for training and evaluation
+and as high-contrast masks for visual inspection.
 """
 
 from pathlib import Path
@@ -137,13 +137,13 @@ def save_images(dataset, mode="train"):
     """Export a dataset split to disk as PNG files.
 
     Images are normalised with ``prepare_item`` and written to
-    ``IMAGES_PATH / mode``, named sequentially as ``img_XXXXXX.png``. When
-    ``mode`` is ``"train"``, two masks are also generated for every image
-    under the same file name and at the same resolution:
+    ``IMAGES_PATH / mode``, named sequentially as ``img_XXXXXX.png``. Two
+    masks are also generated for every image under the same file name and at
+    the same resolution:
 
-        - ``train_masks``: class-index masks (0, 1, 2) used as training
-          targets.
-        - ``train_masks_visible``: the same masks rescaled to 0, 128 and 255
+        - ``<mode>_masks``: class-index masks (0, 1, 2) used as training
+          and evaluation targets.
+        - ``<mode>_masks_visible``: the same masks rescaled to 0, 128 and 255
           for visual inspection.
 
     Output directories are created if they do not already exist.
@@ -152,7 +152,7 @@ def save_images(dataset, mode="train"):
         dataset (datasets.Dataset): Dataset split whose items provide the
             ``image`` and ``bboxes`` fields.
         mode (str, optional): Name of the split, used as the output
-            subdirectory. Masks are only generated for ``"train"``.
+            subdirectory and as the prefix of the mask directories.
             Defaults to ``"train"``.
     """
     path = IMAGES_PATH / mode
@@ -187,8 +187,8 @@ def save_images(dataset, mode="train"):
 def main():
     """Download the dataset and export the U-Net training data.
 
-    Loads the ICDAR2019-SROIE dataset and saves the train split (images and
-    masks) and the test split (images only) under ``IMAGES_PATH``.
+    Loads the ICDAR2019-SROIE dataset and saves the train and test splits
+    (images and masks) under ``IMAGES_PATH``.
     """
     dataset = load_dataset(DATASET_NAME)
 
