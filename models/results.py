@@ -10,10 +10,10 @@ def default_results_dir(model_name):
     return os.path.join("results", model_name)
 
 
-def save_results(model_name, config, history, results_dir=None, best_metric="val_loss", test_metrics=None):
+def save_results(model_name, config, history, results_dir=None, best_metric="val_loss", best_mode="min", test_metrics=None):
     """
     Guarda la configuración y el historial de un entrenamiento en un JSON con marca de tiempo.
-    La mejor época es la que minimiza best_metric (debe coincidir con el criterio del checkpoint).
+    La mejor época es la que minimiza best_metric (o la maximiza si best_mode='max'); debe coincidir con el criterio del checkpoint.
     test_metrics son las métricas del mejor checkpoint sobre el conjunto de test, si se han calculado.
     Devuelve la ruta del fichero generado.
     """
@@ -23,7 +23,8 @@ def save_results(model_name, config, history, results_dir=None, best_metric="val
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     path = os.path.join(results_dir, f"{model_name}_{timestamp}.json")
 
-    best = min(history, key=lambda h: h[best_metric]) if history else None
+    pick = max if best_mode == "max" else min
+    best = pick(history, key=lambda h: h[best_metric]) if history else None
 
     with open(path, "w", encoding="utf-8") as f:
         json.dump({
@@ -31,6 +32,7 @@ def save_results(model_name, config, history, results_dir=None, best_metric="val
             "timestamp": timestamp,
             "config": config,
             "best_metric": best_metric,
+            "best_mode": best_mode,
             "best_epoch": best,
             "test": test_metrics,
             "history": history,
