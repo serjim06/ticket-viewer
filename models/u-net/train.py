@@ -1,19 +1,63 @@
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torch
+from torch import nn
 import torch.nn.functional as F
 from models.pause import TrainingPause
 
 IGNORE_INDEX = 255
+TEXT_CLASSES = (1, 2)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-def accuracy(model, loader, num_classes=3, device=device):
+
+def soft_dice_loss(scores, y, classes=TEXT_CLASSES, smooth=1.0):
+    """
+    Dice loss suave (1 - Dice) sobre las probabilidades softmax, ignorando los píxeles de padding.
+    Se calcula sobre todo el batch para cada clase de `classes` y se promedia, igual que la métrica:
+    solo las clases de texto, sin el fondo.
+    """
+    probs = F.softmax(scores, dim=1)
+    valid = (y != IGNORE_INDEX).unsqueeze(1)                       # (B, 1, H, W)
+    target = F.one_hot(y.masked_fill(~valid.squeeze(1), 0), scores.shape[1])
+    target = target.permute(0, 3, 1, 2).to(probs.dtype)            # (B, C, H, W)
+
+    classes = list(classes)
+    p = (probs * valid)[:, classes]
+    t = (target * valid)[:, classes]
+
+    inter = (p * t).sum(dim=(0, 2, 3))
+    denom = p.sum(dim=(0, 2, 3)) + t.sum(dim=(0, 2, 3))
+
+    return 1 - ((2 * inter + smooth) / (denom + smooth)).mean()
+
+
+class SegmentationLoss(nn.Module):
+    """
+    Cross-entropy (con pesos por clase opcionales) + `dice_weight` * Dice loss de las clases de texto.
+    Con class_weights=None y dice_weight=0 es la cross-entropy de siempre.
+    """
+    def __init__(self, class_weights=None, dice_weight=0.0):
+        super().__init__()
+        weight = torch.tensor(class_weights, dtype=torch.float32) if class_weights is not None else None
+        self.register_buffer("class_weights", weight)
+        self.dice_weight = dice_weight
+
+    def forward(self, scores, y):
+        loss = F.cross_entropy(scores, y, weight=self.class_weights, ignore_index=IGNORE_INDEX)
+        if self.dice_weight:
+            loss = loss + self.dice_weight * soft_dice_loss(scores, y)
+        return loss
+
+
+def accuracy(model, loader, num_classes=3, device=device, loss_fn=None):
     """
     Calcula pérdida, accuracy, Dice e IoU sobre un loader, ignorando los píxeles de padding.
+    La pérdida es `loss_fn` (cross-entropy sin pesos si es None), la misma que en entrenamiento.
     Dice e IoU se calculan por clase acumulando sobre todo el loader, y se devuelve la media
     de las clases de texto (1 = relleno, 2 = borde), sin el fondo.
     También devuelve el Dice de cada clase (lista indexada por clase) para seguir el borde por separado.
     """
+    loss_fn = (loss_fn or SegmentationLoss()).to(device)
     model = model.to(device)
     model.eval()
 
@@ -30,7 +74,7 @@ def accuracy(model, loader, num_classes=3, device=device):
             y = y.to(device=device, dtype=torch.long)
 
             scores = model(x)
-            cost += F.cross_entropy(scores, y, ignore_index=IGNORE_INDEX).item()
+            cost += loss_fn(scores, y).item()
 
             preds = torch.argmax(scores, dim=1)
             valid = y != IGNORE_INDEX
@@ -54,13 +98,15 @@ def accuracy(model, loader, num_classes=3, device=device):
     return cost / len(loader), correct / total, dice, iou, dice_c.tolist()
 
 def train(model, optimiser, train_loader, val_loader, device, scheduler=None, epochs=100,
-          output_path="best_unet_model.pth", patience=10):
+          output_path="best_unet_model.pth", patience=10, loss_fn=None):
     """
     Entrena la U-Net guardando el checkpoint con mayor Dice de validación.
+    `loss_fn` es la pérdida de entrenamiento y validación (cross-entropy sin pesos si es None).
     Si el Dice no mejora en `patience` épocas seguidas, se detiene. patience=0 lo desactiva.
     Con Ctrl+C se pausa liberando la GPU; desde la pausa se puede terminar, descartando la época en curso.
     Devuelve el histórico por época.
     """
+    loss_fn = (loss_fn or SegmentationLoss()).to(device)
     model = model.to(device)
 
     best_dice = -1.0
@@ -80,7 +126,7 @@ def train(model, optimiser, train_loader, val_loader, device, scheduler=None, ep
             y = y.to(device=device, dtype=torch.long)
 
             scores = model(x)
-            cost = F.cross_entropy(input=scores, target=y, ignore_index=IGNORE_INDEX)
+            cost = loss_fn(scores, y)
 
             optimiser.zero_grad()
             cost.backward()
@@ -109,7 +155,7 @@ def train(model, optimiser, train_loader, val_loader, device, scheduler=None, ep
         train_cost = train_cost_acum / len(train_loader)
         train_acc = train_correct_num / train_total
 
-        val_cost, val_acc, dice, iou, dice_c = accuracy(model, val_loader, device=device)
+        val_cost, val_acc, dice, iou, dice_c = accuracy(model, val_loader, device=device, loss_fn=loss_fn)
         val_cost, val_acc, dice, iou = float(val_cost), float(val_acc), float(dice), float(iou)
         dice_fill, dice_border = dice_c[1], dice_c[2]
 

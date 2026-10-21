@@ -35,6 +35,8 @@ def parse_args():
     unet.add_argument('--patience', type=int, default=10, help='Épocas sin mejorar val_dice antes de parar el entrenamiento; 0 lo desactiva (default: 10)')
     unet.add_argument('--lr', type=float, default=1e-3, help='Learning rate (default: 1e-3)')
     unet.add_argument('--channels', type=int, default=32, help='Canales de la primera capa de la U-Net (default: 32)')
+    unet.add_argument('--class-weights', type=float, nargs=3, default=None, metavar=('FONDO', 'RELLENO', 'BORDE'), help='Pesos por clase de la cross-entropy, p. ej. 1 1.8 3.4 (default: sin pesos)')
+    unet.add_argument('--dice-weight', type=float, default=0.0, help='Peso de la Dice loss de las clases de texto sumada a la cross-entropy; 0 la desactiva (default: 0)')
     unet.add_argument('--device', type=str, default=None, choices=['cuda', 'cpu'], help='Dispositivo a usar (default: cuda si está disponible, si no cpu)')
     unet.add_argument('--init-weights', type=str, default=None, help='Pesos (*.pth) con los que inicializar el modelo antes de entrenar (default: inicialización aleatoria)')
     unet.add_argument('--output', type=str, default='best_unet_model.pth', help='Ruta donde guardar los mejores pesos del modelo (default: best_unet_model.pth)')
@@ -118,6 +120,7 @@ def train_unet(args, device):
     load_init_weights(model, args, device)
     optimiser = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode='min', factor=0.5, patience=3)
+    loss_fn = unet_train.SegmentationLoss(class_weights=args.class_weights, dice_weight=args.dice_weight)
 
     print(f"Preprocesado completado. Iniciando entrenamiento en {device}...")
 
@@ -130,7 +133,8 @@ def train_unet(args, device):
         scheduler=scheduler,
         epochs=args.epochs,
         output_path=args.output,
-        patience=args.patience
+        patience=args.patience,
+        loss_fn=loss_fn
     )
 
     test_metrics = None
@@ -140,7 +144,7 @@ def train_unet(args, device):
     elif has_test_masks:
         print("Entrenamiento completado. Evaluando el mejor checkpoint en test...")
         model.load_state_dict(torch.load(args.output, map_location=device))
-        test_loss, test_acc, test_dice, test_iou, test_dice_c = unet_train.accuracy(model, test_loader, device=device)
+        test_loss, test_acc, test_dice, test_iou, test_dice_c = unet_train.accuracy(model, test_loader, device=device, loss_fn=loss_fn)
         test_metrics = {
             "test_loss": test_loss,
             "test_acc": test_acc,
