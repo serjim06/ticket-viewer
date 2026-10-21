@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from models.pause import TrainingPause
 
 def greedy_decode(log_probs, idx2char, blank_idx=0):
     """
@@ -113,6 +114,7 @@ def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, d
     """
     Entrena el modelo guardando el checkpoint con menor val_cer.
     Si val_cer no mejora en `patience` épocas seguidas, se detiene (early stopping). patience=0 lo desactiva.
+    Con Ctrl+C se pausa liberando la GPU; desde la pausa se puede terminar, descartando la época en curso.
     """
     model = model.to(device)
 
@@ -123,6 +125,8 @@ def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, d
     best_val_cer = float('inf')
     epochs_without_improvement = 0
     history = []
+    pauser = TrainingPause(model, optimizer, device)
+    stop = False
 
     for epoch in range(1, epochs + 1):
         # Entrenamiento
@@ -148,7 +152,18 @@ def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, d
             optimizer.step()
             
             train_loss += loss.item()
-            
+
+            if pauser.requested:
+                # Se sueltan los tensores del batch para que la pausa pueda liberar su memoria en la GPU
+                del images, targets, target_lengths, log_probs, input_lengths, loss
+                stop = pauser.pause()
+                if stop:
+                    break
+
+        if stop:
+            print(f"Entrenamiento terminado manualmente en la época {epoch}, que se descarta. Mejor val_cer: {best_val_cer:.4f}")
+            break
+
         avg_train_loss = train_loss / len(train_loader)
         
         # Validación
@@ -186,4 +201,5 @@ def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, d
             print(f"Early stopping: val_cer sin mejorar en {patience} épocas. Mejor val_cer: {best_val_cer:.4f}")
             break
 
+    pauser.close()
     return history

@@ -1,6 +1,7 @@
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torch
 import torch.nn.functional as F
+from models.pause import TrainingPause
 
 IGNORE_INDEX = 255
 
@@ -57,6 +58,7 @@ def train(model, optimiser, train_loader, val_loader, device, scheduler=None, ep
     """
     Entrena la U-Net guardando el checkpoint con mayor Dice de validación.
     Si el Dice no mejora en `patience` épocas seguidas, se detiene. patience=0 lo desactiva.
+    Con Ctrl+C se pausa liberando la GPU; desde la pausa se puede terminar, descartando la época en curso.
     Devuelve el histórico por época.
     """
     model = model.to(device)
@@ -64,6 +66,8 @@ def train(model, optimiser, train_loader, val_loader, device, scheduler=None, ep
     best_dice = -1.0
     epochs_without_improvement = 0
     history = []
+    pauser = TrainingPause(model, optimiser, device)
+    stop = False
 
     for epoch in range(1, epochs + 1):
         model.train()
@@ -90,6 +94,17 @@ def train(model, optimiser, train_loader, val_loader, device, scheduler=None, ep
             train_correct_num += (train_predictions[valid] == y[valid]).sum().item()
             train_total += valid.sum().item()
             train_cost_acum += cost.item()
+
+            if pauser.requested:
+                # Se sueltan los tensores del batch para que la pausa pueda liberar su memoria en la GPU
+                del x, y, scores, cost, valid, train_predictions
+                stop = pauser.pause()
+                if stop:
+                    break
+
+        if stop:
+            print(f"Entrenamiento terminado manualmente en la época {epoch}, que se descarta. Mejor Dice: {best_dice:.4f}")
+            break
 
         train_cost = train_cost_acum / len(train_loader)
         train_acc = train_correct_num / train_total
@@ -131,4 +146,5 @@ def train(model, optimiser, train_loader, val_loader, device, scheduler=None, ep
             print(f"Early stopping: Dice sin mejorar en {patience} épocas. Mejor Dice: {best_dice:.4f}")
             break
 
+    pauser.close()
     return history

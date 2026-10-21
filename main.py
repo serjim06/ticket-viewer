@@ -68,6 +68,11 @@ def train_crnn(args, device):
         patience=args.patience
     )
 
+    if not history:
+        # Terminado desde la pausa antes de completar una época: no hay checkpoint de esta ejecución
+        print("Entrenamiento terminado sin ninguna época completa: se omite la evaluación en test.")
+        return history, None, 'val_cer', 'min'
+
     print("Entrenamiento completado. Evaluando el mejor checkpoint en test...")
 
     test_metrics = evaluate_model(
@@ -113,7 +118,10 @@ def train_unet(args, device):
     )
 
     test_metrics = None
-    if has_test_masks:
+    if not history:
+        # Terminado desde la pausa antes de completar una época: no hay checkpoint de esta ejecución
+        print("Entrenamiento terminado sin ninguna época completa: se omite la evaluación en test.")
+    elif has_test_masks:
         print("Entrenamiento completado. Evaluando el mejor checkpoint en test...")
         model.load_state_dict(torch.load(args.output, map_location=device))
         test_loss, test_acc, test_dice, test_iou, test_dice_c = unet_train.accuracy(model, test_loader, device=device)

@@ -122,6 +122,8 @@ python main.py crnn --epochs 50 --batch-size 32 --lr 5e-4 --device cuda --output
 | `--output` | `best_crnn_model.pth` | Path to save the best model weights |
 | `--results-dir` | `results/crnn` | Directory where the training results JSON is saved |
 
+**Pausing training.** For both models, pressing `Ctrl+C` pauses training once the current batch finishes. While paused, the model and optimizer state are moved to the CPU and the CUDA cache is emptied, so the GPU memory is freed (only the CUDA context of the process remains). From the pause you can continue (`c`), which moves everything back to the GPU and carries on from the same batch, or finish (`t`), which discards the unfinished epoch and ends training as a normal run would: the best checkpoint is evaluated on test and the results JSON is saved. If no epoch was completed, the test evaluation is skipped.
+
 ### 3. Train the text detector (work in progress)
 
 ```bash
