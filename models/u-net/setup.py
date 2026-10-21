@@ -7,9 +7,11 @@ first cropped to the receipt area, and then all images are resized to
 ``TARGET_WIDTH`` keeping their aspect ratio. For both the train and test
 splits, it also generates segmentation masks from the text bounding boxes at
 the final resolution, both as class-index masks for training and evaluation
-and as high-contrast masks for visual inspection.
+and as high-contrast masks for visual inspection, and saves the boxes
+themselves to a JSON file so detections can be evaluated box by box.
 """
 
+import json
 from pathlib import Path
 
 import cv2
@@ -146,6 +148,12 @@ def save_images(dataset, mode="train"):
         - ``<mode>_masks_visible``: the same masks rescaled to 0, 128 and 255
           for visual inspection.
 
+    The boxes of every image, in the same coordinates as the exported image,
+    are saved to ``IMAGES_PATH / f"{mode}_boxes.json"`` as a mapping from
+    file name to a list of ``[x_min, y_min, x_max, y_max]`` boxes. They are
+    the ground truth for box-level evaluation, since overlapping boxes merge
+    in the masks and cannot be recovered from them.
+
     Output directories are created if they do not already exist.
 
     Args:
@@ -158,9 +166,12 @@ def save_images(dataset, mode="train"):
     path = IMAGES_PATH / mode
     path.mkdir(parents=True, exist_ok=True)
 
+    boxes = {}
     count = 0
     for item in dataset:
         img, bboxes = prepare_item(item)
+
+        boxes[f"img_{count:06d}.png"] = bboxes.tolist()
 
         m_path = IMAGES_PATH / f"{mode}_masks"
         m_path.mkdir(parents=True, exist_ok=True)
@@ -183,6 +194,8 @@ def save_images(dataset, mode="train"):
         cv2.imwrite(path / f"img_{count:06d}.png", img)
 
         count += 1
+
+    (IMAGES_PATH / f"{mode}_boxes.json").write_text(json.dumps(boxes))
 
 def main():
     """Download the dataset and export the U-Net training data.
