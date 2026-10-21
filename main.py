@@ -20,6 +20,7 @@ def parse_args():
     crnn.add_argument('--patience', type=int, default=5, help='Épocas sin mejorar val_cer antes de parar el entrenamiento; 0 lo desactiva (default: 5)')
     crnn.add_argument('--lr', type=float, default=1e-3, help='Learning rate (default: 1e-3)')
     crnn.add_argument('--device', type=str, default=None, choices=['cuda', 'cpu'], help='Dispositivo a usar (default: cuda si está disponible, si no cpu)')
+    crnn.add_argument('--init-weights', type=str, default=None, help='Pesos (*.pth) con los que inicializar el modelo antes de entrenar (default: inicialización aleatoria)')
     crnn.add_argument('--output', type=str, default='best_crnn_model.pth', help='Ruta donde guardar los mejores pesos del modelo (default: best_crnn_model.pth)')
     crnn.add_argument('--results-dir', type=str, default=default_results_dir('crnn'), help='Directorio donde guardar los resultados del entrenamiento (default: results/crnn)')
 
@@ -35,10 +36,23 @@ def parse_args():
     unet.add_argument('--lr', type=float, default=1e-3, help='Learning rate (default: 1e-3)')
     unet.add_argument('--channels', type=int, default=32, help='Canales de la primera capa de la U-Net (default: 32)')
     unet.add_argument('--device', type=str, default=None, choices=['cuda', 'cpu'], help='Dispositivo a usar (default: cuda si está disponible, si no cpu)')
+    unet.add_argument('--init-weights', type=str, default=None, help='Pesos (*.pth) con los que inicializar el modelo antes de entrenar (default: inicialización aleatoria)')
     unet.add_argument('--output', type=str, default='best_unet_model.pth', help='Ruta donde guardar los mejores pesos del modelo (default: best_unet_model.pth)')
     unet.add_argument('--results-dir', type=str, default=default_results_dir('unet'), help='Directorio donde guardar los resultados del entrenamiento (default: results/unet)')
 
     return parser.parse_args()
+
+
+def load_init_weights(model, args, device):
+    """
+    Carga en el modelo los pesos de --init-weights, si se han indicado, para continuar entrenando desde ellos.
+    """
+    if args.init_weights:
+        model.load_state_dict(torch.load(args.init_weights, map_location=device, weights_only=True))
+        print(f"Modelo inicializado con los pesos de {args.init_weights}")
+        if os.path.abspath(args.init_weights) == os.path.abspath(args.output):
+            # El mejor valor de la métrica empieza de cero, así que la primera época siempre guarda checkpoint
+            print(f"Aviso: --init-weights coincide con --output; {args.output} se sobrescribirá al terminar la primera época.")
 
 
 def train_crnn(args, device):
@@ -53,6 +67,7 @@ def train_crnn(args, device):
     num_classes = len(vocab)
 
     model = CRNN(1, num_classes, 256)
+    load_init_weights(model, args, device)
 
     print(f"Preprocesado completado. Iniciando entrenamiento en {device}...")
 
@@ -100,6 +115,7 @@ def train_unet(args, device):
         split=args.split, batch_size=args.batch_size, shuffle=True)
 
     model = unet_module.UNet(1, args.channels, 3)
+    load_init_weights(model, args, device)
     optimiser = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode='min', factor=0.5, patience=3)
 
