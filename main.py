@@ -54,7 +54,7 @@ def train_crnn(args, device):
 
     model = CRNN(1, num_classes, 256)
 
-    print("Preprocesado completado. Iniciando entrenamiento...")
+    print(f"Preprocesado completado. Iniciando entrenamiento en {device}...")
 
     history = train_model(
         model=model,
@@ -98,7 +98,7 @@ def train_unet(args, device):
     optimiser = torch.optim.Adam(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode='min', factor=0.5, patience=3)
 
-    print("Preprocesado completado. Iniciando entrenamiento...")
+    print(f"Preprocesado completado. Iniciando entrenamiento en {device}...")
 
     history = unet_train.train(
         model=model,

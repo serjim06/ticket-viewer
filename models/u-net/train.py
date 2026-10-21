@@ -123,7 +123,7 @@ def train(model, optimiser, train_loader, val_loader, device, scheduler=None, ep
             "lr": optimiser.param_groups[0]['lr'],
         })
 
-        print(f"Epoch [{epoch}/{epochs}] | Train Loss: {train_cost:.4f} | Val Loss: {val_cost:.4f} | "
+        print(f"Epoch [{epoch:03d}/{epochs:03d}] | Train Loss: {train_cost:.4f} | Val Loss: {val_cost:.4f} | "
               f"Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f} | Dice: {dice:.4f} "
               f"(relleno {dice_fill:.4f}, borde {dice_border:.4f}) | IoU: {iou:.4f}{saved_str}")
 

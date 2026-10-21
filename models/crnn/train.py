@@ -176,7 +176,7 @@ def train_model(model, train_loader, val_loader, idx2char, epochs=20, lr=1e-3, d
             "lr": optimizer.param_groups[0]['lr'],
         })
 
-        print(f"Epoch [{epoch}/{epochs}] | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f} | Val CER: {val_cer:.4f} | Val Word Acc: {val_word_acc:.4f}{saved_str}")
+        print(f"Epoch [{epoch:03d}/{epochs:03d}] | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f} | Val CER: {val_cer:.4f} | Val Word Acc: {val_word_acc:.4f}{saved_str}")
         
         print(f"  Real : {val_targets[:2]}")
         print(f"  Pred : {val_preds[:2]}")
