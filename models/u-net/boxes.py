@@ -18,7 +18,7 @@ FILL_CLASS = 1
 BORDER_PAD = 2
 
 
-def mask_to_boxes(mask, min_area=20, pad=BORDER_PAD):
+def mask_to_boxes(mask, min_area=50, pad=BORDER_PAD):
     """Extract word bounding boxes from a class-index segmentation mask.
 
     Connected regions of the fill class are found with 4-connectivity, so two
@@ -31,7 +31,7 @@ def mask_to_boxes(mask, min_area=20, pad=BORDER_PAD):
         mask (np.ndarray): ``(H, W)`` mask with class indices (0, 1, 2), such
             as the ``argmax`` of the U-Net output with the padding cropped.
         min_area (int, optional): Minimum number of fill pixels for a region
-            to be kept. Defaults to 20.
+            to be kept. Defaults to 50.
         pad (int, optional): Pixels added to each side of every box. Defaults
             to ``BORDER_PAD``.
 
@@ -252,7 +252,7 @@ def main():
     parser = argparse.ArgumentParser(description="Evalúa por cajas las máscaras de una carpeta frente a las cajas reales.")
     parser.add_argument('--masks', type=str, default='datasets/u-net/test_masks', help='Carpeta con las máscaras de clases (default: datasets/u-net/test_masks)')
     parser.add_argument('--boxes', type=str, default='datasets/u-net/test_boxes.json', help='JSON con las cajas reales (default: datasets/u-net/test_boxes.json)')
-    parser.add_argument('--min-area', type=int, default=20, help='Área mínima de una región de relleno (default: 20)')
+    parser.add_argument('--min-area', type=int, default=50, help='Área mínima de una región de relleno (default: 50)')
     parser.add_argument('--pad', type=int, default=BORDER_PAD, help=f'Píxeles añadidos a cada lado de la caja (default: {BORDER_PAD})')
     parser.add_argument('--iou', type=float, default=0.5, help='IoU mínimo para un acierto (default: 0.5)')
     args = parser.parse_args()
