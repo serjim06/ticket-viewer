@@ -1,8 +1,12 @@
+import importlib
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torch
 from torch import nn
 import torch.nn.functional as F
 from models.pause import TrainingPause
+
+# El directorio "u-net" no es un identificador válido, así que se importa por nombre
+unet_boxes = importlib.import_module('models.u-net.boxes')
 
 IGNORE_INDEX = 255
 TEXT_CLASSES = (1, 2)
@@ -96,6 +100,31 @@ def accuracy(model, loader, num_classes=3, device=device, loss_fn=None):
     iou = iou_c[1:].mean().item()
 
     return cost / len(loader), correct / total, dice, iou, dice_c.tolist()
+
+
+def box_accuracy(model, loader, gt_boxes, device=device):
+    """
+    Evalúa por cajas sobre un loader sin barajar y con batch 1 (el de test): cada máscara predicha
+    se recorta quitando el padding, se convierte en cajas con mask_to_boxes y se compara con las cajas
+    reales de `gt_boxes` (nombre de fichero -> lista de cajas, como en test_boxes.json).
+    Devuelve el diccionario de evaluate_boxes: precisión, recall, F1, IoU medio, fusiones y cortes.
+    """
+    model = model.to(device)
+    model.eval()
+
+    names = loader.dataset.images
+    pairs = []
+
+    with torch.no_grad():
+        for name, (x, y) in zip(names, loader):
+            x = x.to(device=device, dtype=torch.float32)
+            valid = y[0] != IGNORE_INDEX
+            h, w = int(valid.any(dim=1).sum()), int(valid.any(dim=0).sum())
+
+            preds = torch.argmax(model(x), dim=1)[0, :h, :w].cpu().numpy()
+            pairs.append((unet_boxes.mask_to_boxes(preds), gt_boxes[name]))
+
+    return unet_boxes.evaluate_boxes(pairs)
 
 def train(model, optimiser, train_loader, val_loader, device, scheduler=None, epochs=100,
           output_path="best_unet_model.pth", patience=10, loss_fn=None):

@@ -1,5 +1,6 @@
 import argparse
 import importlib
+import json
 import os
 from models.results import save_results, default_results_dir
 import torch
@@ -29,6 +30,7 @@ def parse_args():
     unet.add_argument('--train-mask-dir', type=str, default='datasets/u-net/train_masks', help='Directorio con las máscaras de entrenamiento (default: datasets/u-net/train_masks)')
     unet.add_argument('--test-dir', type=str, default='datasets/u-net/test', help='Directorio con las imágenes de test (default: datasets/u-net/test)')
     unet.add_argument('--test-mask-dir', type=str, default='datasets/u-net/test_masks', help='Directorio con las máscaras de test; si no existe se omite la evaluación en test (default: datasets/u-net/test_masks)')
+    unet.add_argument('--test-boxes', type=str, default='datasets/u-net/test_boxes.json', help='JSON con las cajas reales de test; si no existe se omite la evaluación por cajas (default: datasets/u-net/test_boxes.json)')
     unet.add_argument('--split', type=float, default=0.8, help="Train/val split")
     unet.add_argument('--batch-size', type=int, default=8, help='Tamaño de batch (default: 8)')
     unet.add_argument('--epochs', type=int, default=100, help='Número de épocas de entrenamiento (default: 100)')
@@ -154,6 +156,16 @@ def train_unet(args, device):
             "test_iou": test_iou,
         }
         print(f"Test | Loss: {test_loss:.4f} | Acc: {test_acc:.4f} | Dice: {test_dice:.4f} | IoU: {test_iou:.4f}")
+
+        if os.path.isfile(args.test_boxes):
+            with open(args.test_boxes) as f:
+                gt_boxes = json.load(f)
+            box_metrics = unet_train.box_accuracy(model, test_loader, gt_boxes, device=device)
+            test_metrics.update({f"test_box_{k}": v for k, v in box_metrics.items()})
+            print(f"Test (cajas) | Precisión: {box_metrics['precision']:.4f} | Recall: {box_metrics['recall']:.4f} | "
+                  f"F1: {box_metrics['f1']:.4f} | Fusiones: {box_metrics['merges']} | Cortes: {box_metrics['splits']}")
+        else:
+            print(f"No existe {args.test_boxes}: se omite la evaluación por cajas.")
     else:
         print(f"Entrenamiento completado. No existe {args.test_mask_dir}: se omite la evaluación en test.")
 

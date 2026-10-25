@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from matplotlib.colors import ListedColormap
+from matplotlib.patches import Rectangle
 from PIL import Image
 from torchvision import tv_tensors
 from torchvision.transforms import v2
@@ -22,6 +23,7 @@ from models.crnn.train import greedy_decode
 # El directorio "u-net" no es un identificador válido, así que se importa por nombre
 unet_module = importlib.import_module('models.u-net.unet')
 unet_preprocess = importlib.import_module('models.u-net.preprocess')
+unet_boxes = importlib.import_module('models.u-net.boxes')
 
 RAW_CHARS = " #$%&'()*-./0123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZlr"
 BLANK_TOKEN = "<BLANK>"
@@ -69,20 +71,24 @@ def show_results(image_paths, predictions):
     plt.show()
 
 
-def show_masks(image_paths, masks):
-    """Display each image next to the same image with its predicted mask overlaid.
+def show_masks(image_paths, masks, boxes):
+    """Display each image with its predicted word boxes next to the same image with its mask overlaid.
 
     Args:
         image_paths: Paths to the source images, in prediction order.
         masks: Predicted class mask (H, W) for each image.
+        boxes: Predicted (N, 4) boxes in (x_min, y_min, x_max, y_max) coordinates for each image.
     """
     num_imgs = len(image_paths)
     fig, axes = plt.subplots(num_imgs, 2, figsize=(10, 6 * num_imgs), squeeze=False)
 
-    for i, (path, mask) in enumerate(zip(image_paths, masks)):
+    for i, (path, mask, img_boxes) in enumerate(zip(image_paths, masks, boxes)):
         img = Image.open(path).convert('L')
         axes[i][0].imshow(img, cmap='gray')
-        axes[i][0].set_title(os.path.basename(path), fontsize=10)
+        for x0, y0, x1, y1 in img_boxes:
+            axes[i][0].add_patch(Rectangle((x0 - 0.5, y0 - 0.5), x1 - x0 + 1, y1 - y0 + 1,
+                                           fill=False, edgecolor='blue', linewidth=1))
+        axes[i][0].set_title(f"{os.path.basename(path)} ({len(img_boxes)} cajas)", fontsize=10)
         axes[i][1].imshow(img, cmap='gray')
         axes[i][1].imshow(mask, cmap=MASK_CMAP, vmin=0, vmax=len(UNET_CLASSES) - 1, interpolation='nearest')
         axes[i][1].set_title("Máscara (verde: relleno, rojo: borde)", fontsize=10, color='blue')
@@ -190,13 +196,14 @@ def run_unet(args, image_paths, device):
     model.to(device)
 
     masks = predict_masks(model, image_paths, device)
+    boxes = [unet_boxes.mask_to_boxes(mask) for mask in masks]
 
     print("\n--- Resultados ---")
-    for img_path, mask in zip(image_paths, masks):
+    for img_path, mask, img_boxes in zip(image_paths, masks, boxes):
         shares = ", ".join(f"{name}: {np.mean(mask == c):.1%}" for c, name in enumerate(UNET_CLASSES))
-        print(f"[{os.path.basename(img_path)}] -> {shares}")
+        print(f"[{os.path.basename(img_path)}] -> {len(img_boxes)} cajas | {shares}")
 
-    show_masks(image_paths, masks)
+    show_masks(image_paths, masks, boxes)
 
 
 RUNNERS = {
