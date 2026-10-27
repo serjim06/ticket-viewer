@@ -3,6 +3,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torch
 from torch import nn
 import torch.nn.functional as F
+from torch.utils.data import Subset
 from models.pause import TrainingPause
 
 # El directorio "u-net" no es un identificador válido, así que se importa por nombre
@@ -10,6 +11,12 @@ unet_boxes = importlib.import_module('models.u-net.boxes')
 
 IGNORE_INDEX = 255
 TEXT_CLASSES = (1, 2)
+
+# Criterio de selección del checkpoint según haya cajas reales de validación: (clave del histórico, nombre)
+SELECTION_METRIC = {
+    False: ("val_dice", "Dice"),
+    True: ("val_box_f1", "F1 de cajas"),
+}
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -102,17 +109,25 @@ def accuracy(model, loader, num_classes=3, device=device, loss_fn=None):
     return cost / len(loader), correct / total, dice, iou, dice_c.tolist()
 
 
+def loader_names(loader):
+    """Nombres de fichero de un loader sin barajar, en orden; admite un Subset (el de validación)."""
+    dataset = loader.dataset
+    if isinstance(dataset, Subset):
+        return [dataset.dataset.images[i] for i in dataset.indices]
+    return dataset.images
+
+
 def box_accuracy(model, loader, gt_boxes, device=device):
     """
-    Evalúa por cajas sobre un loader sin barajar y con batch 1 (el de test): cada máscara predicha
-    se recorta quitando el padding, se convierte en cajas con mask_to_boxes y se compara con las cajas
-    reales de `gt_boxes` (nombre de fichero -> lista de cajas, como en test_boxes.json).
+    Evalúa por cajas sobre un loader sin barajar y con batch 1 (el de validación o el de test): cada
+    máscara predicha se recorta quitando el padding, se convierte en cajas con mask_to_boxes y se compara
+    con las cajas reales de `gt_boxes` (nombre de fichero -> lista de cajas, como en *_boxes.json).
     Devuelve el diccionario de evaluate_boxes: precisión, recall, F1, IoU medio, fusiones y cortes.
     """
     model = model.to(device)
     model.eval()
 
-    names = loader.dataset.images
+    names = loader_names(loader)
     pairs = []
 
     with torch.no_grad():
@@ -127,18 +142,21 @@ def box_accuracy(model, loader, gt_boxes, device=device):
     return unet_boxes.evaluate_boxes(pairs)
 
 def train(model, optimiser, train_loader, val_loader, device, scheduler=None, epochs=100,
-          output_path="best_unet_model.pth", patience=10, loss_fn=None):
+          output_path="best_unet_model.pth", patience=10, loss_fn=None, val_boxes=None):
     """
-    Entrena la U-Net guardando el checkpoint con mayor Dice de validación.
+    Entrena la U-Net guardando el mejor checkpoint según validación.
     `loss_fn` es la pérdida de entrenamiento y validación (cross-entropy sin pesos si es None).
-    Si el Dice no mejora en `patience` épocas seguidas, se detiene. patience=0 lo desactiva.
+    Con `val_boxes` (nombre de fichero -> cajas reales, como en train_boxes.json) se evalúa también por
+    cajas en cada época y el criterio es el F1 de cajas; sin ellas, el Dice de píxel.
+    Si el criterio no mejora en `patience` épocas seguidas, se detiene. patience=0 lo desactiva.
     Con Ctrl+C se pausa liberando la GPU; desde la pausa se puede terminar, descartando la época en curso.
     Devuelve el histórico por época.
     """
     loss_fn = (loss_fn or SegmentationLoss()).to(device)
     model = model.to(device)
 
-    best_dice = -1.0
+    best_metric, metric_name = SELECTION_METRIC[val_boxes is not None]
+    best_score = -1.0
     epochs_without_improvement = 0
     history = []
     pauser = TrainingPause(model, optimiser, device)
@@ -178,7 +196,7 @@ def train(model, optimiser, train_loader, val_loader, device, scheduler=None, ep
                     break
 
         if stop:
-            print(f"Entrenamiento terminado manualmente en la época {epoch}, que se descarta. Mejor Dice: {best_dice:.4f}")
+            print(f"Entrenamiento terminado manualmente en la época {epoch}, que se descarta. Mejor {metric_name}: {best_score:.4f}")
             break
 
         train_cost = train_cost_acum / len(train_loader)
@@ -191,16 +209,7 @@ def train(model, optimiser, train_loader, val_loader, device, scheduler=None, ep
         if isinstance(scheduler, ReduceLROnPlateau):
             scheduler.step(val_cost)
 
-        if dice > best_dice:
-            best_dice = dice
-            epochs_without_improvement = 0
-            torch.save(model.state_dict(), output_path)
-            saved_str = " -> ¡Modelo Guardado!"
-        else:
-            epochs_without_improvement += 1
-            saved_str = ""
-
-        history.append({
+        record = {
             "epoch": epoch,
             "train_loss": train_cost,
             "train_acc": train_acc,
@@ -210,15 +219,32 @@ def train(model, optimiser, train_loader, val_loader, device, scheduler=None, ep
             "val_dice_fill": dice_fill,
             "val_dice_border": dice_border,
             "val_iou": iou,
-            "lr": optimiser.param_groups[0]['lr'],
-        })
+        }
+        box_str = ""
+        if val_boxes is not None:
+            box_metrics = box_accuracy(model, val_loader, val_boxes, device=device)
+            record.update({f"val_box_{k}": v for k, v in box_metrics.items()})
+            box_str = (f" | Cajas F1: {box_metrics['f1']:.4f} (fusiones {box_metrics['merges']}, "
+                       f"cortes {box_metrics['splits']})")
+        record["lr"] = optimiser.param_groups[0]['lr']
+        history.append(record)
+
+        score = record[best_metric]
+        if score > best_score:
+            best_score = score
+            epochs_without_improvement = 0
+            torch.save(model.state_dict(), output_path)
+            saved_str = " -> ¡Modelo Guardado!"
+        else:
+            epochs_without_improvement += 1
+            saved_str = ""
 
         print(f"Epoch [{epoch:03d}/{epochs:03d}] | Train Loss: {train_cost:.4f} | Val Loss: {val_cost:.4f} | "
               f"Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f} | Dice: {dice:.4f} "
-              f"(relleno {dice_fill:.4f}, borde {dice_border:.4f}) | IoU: {iou:.4f}{saved_str}")
+              f"(relleno {dice_fill:.4f}, borde {dice_border:.4f}) | IoU: {iou:.4f}{box_str}{saved_str}")
 
         if patience and epochs_without_improvement >= patience:
-            print(f"Early stopping: Dice sin mejorar en {patience} épocas. Mejor Dice: {best_dice:.4f}")
+            print(f"Early stopping: {metric_name} sin mejorar en {patience} épocas. Mejor {metric_name}: {best_score:.4f}")
             break
 
     pauser.close()

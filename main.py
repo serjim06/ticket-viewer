@@ -30,11 +30,12 @@ def parse_args():
     unet.add_argument('--train-mask-dir', type=str, default='datasets/u-net/train_masks', help='Directorio con las máscaras de entrenamiento (default: datasets/u-net/train_masks)')
     unet.add_argument('--test-dir', type=str, default='datasets/u-net/test', help='Directorio con las imágenes de test (default: datasets/u-net/test)')
     unet.add_argument('--test-mask-dir', type=str, default='datasets/u-net/test_masks', help='Directorio con las máscaras de test; si no existe se omite la evaluación en test (default: datasets/u-net/test_masks)')
+    unet.add_argument('--train-boxes', type=str, default='datasets/u-net/train_boxes.json', help='JSON con las cajas reales de entrenamiento; si existe, se evalúa por cajas en validación y el mejor checkpoint se elige por F1 de cajas en vez de por Dice (default: datasets/u-net/train_boxes.json)')
     unet.add_argument('--test-boxes', type=str, default='datasets/u-net/test_boxes.json', help='JSON con las cajas reales de test; si no existe se omite la evaluación por cajas (default: datasets/u-net/test_boxes.json)')
     unet.add_argument('--split', type=float, default=0.8, help="Train/val split")
-    unet.add_argument('--batch-size', type=int, default=8, help='Tamaño de batch (default: 8)')
+    unet.add_argument('--batch-size', type=int, default=4, help='Tamaño de batch (default: 4)')
     unet.add_argument('--epochs', type=int, default=100, help='Número de épocas de entrenamiento (default: 100)')
-    unet.add_argument('--patience', type=int, default=10, help='Épocas sin mejorar val_dice antes de parar el entrenamiento; 0 lo desactiva (default: 10)')
+    unet.add_argument('--patience', type=int, default=10, help='Épocas sin mejorar el criterio de selección (F1 de cajas o Dice de validación) antes de parar el entrenamiento; 0 lo desactiva (default: 10)')
     unet.add_argument('--lr', type=float, default=1e-3, help='Learning rate (default: 1e-3)')
     unet.add_argument('--channels', type=int, default=32, help='Canales de la primera capa de la U-Net (default: 32)')
     unet.add_argument('--class-weights', type=float, nargs=3, default=None, metavar=('FONDO', 'RELLENO', 'BORDE'), help='Pesos por clase de la cross-entropy, p. ej. 1 1.8 3.4 (default: sin pesos)')
@@ -124,7 +125,13 @@ def train_unet(args, device):
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, mode='min', factor=0.5, patience=3)
     loss_fn = unet_train.SegmentationLoss(class_weights=args.class_weights, dice_weight=args.dice_weight)
 
-    print(f"Preprocesado completado. Iniciando entrenamiento en {device}...")
+    val_boxes = None
+    if os.path.isfile(args.train_boxes):
+        with open(args.train_boxes) as f:
+            val_boxes = json.load(f)
+    best_metric, metric_name = unet_train.SELECTION_METRIC[val_boxes is not None]
+
+    print(f"Preprocesado completado. Iniciando entrenamiento en {device}, eligiendo el checkpoint por {metric_name} de validación...")
 
     history = unet_train.train(
         model=model,
@@ -136,7 +143,8 @@ def train_unet(args, device):
         epochs=args.epochs,
         output_path=args.output,
         patience=args.patience,
-        loss_fn=loss_fn
+        loss_fn=loss_fn,
+        val_boxes=val_boxes
     )
 
     test_metrics = None
@@ -169,7 +177,7 @@ def train_unet(args, device):
     else:
         print(f"Entrenamiento completado. No existe {args.test_mask_dir}: se omite la evaluación en test.")
 
-    return history, test_metrics, 'val_dice', 'max'
+    return history, test_metrics, best_metric, 'max'
 
 
 TRAINERS = {
